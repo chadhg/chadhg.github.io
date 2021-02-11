@@ -6,7 +6,7 @@
   <link href="http://example.com/atom.xml" rel="self"/>
   
   <link href="http://example.com/"/>
-  <updated>2021-02-09T13:20:58.617Z</updated>
+  <updated>2021-02-11T07:46:42.661Z</updated>
   <id>http://example.com/</id>
   
   <author>
@@ -17,22 +17,23 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
-    <title>Hello World</title>
-    <link href="http://example.com/2021/02/09/hello-world/"/>
-    <id>http://example.com/2021/02/09/hello-world/</id>
-    <published>2021-02-09T13:20:58.617Z</published>
-    <updated>2021-02-09T13:20:58.617Z</updated>
+    <title>接口幂等性</title>
+    <link href="http://example.com/2021/02/10/%E6%8E%A5%E5%8F%A3%E5%B9%82%E7%AD%89%E6%80%A7/"/>
+    <id>http://example.com/2021/02/10/%E6%8E%A5%E5%8F%A3%E5%B9%82%E7%AD%89%E6%80%A7/</id>
+    <published>2021-02-10T08:06:59.000Z</published>
+    <updated>2021-02-11T07:46:42.661Z</updated>
     
-    <content type="html"><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p><h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p><h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p><h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p><h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure><p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>]]></content>
+    <content type="html"><![CDATA[<h4 id="什么是接口幂等性"><a href="#什么是接口幂等性" class="headerlink" title="什么是接口幂等性"></a>什么是接口幂等性</h4><p>​    外部调用，失败应该被认为是常态，并且失败之后会存在重复调用的情况，而幂等性，就是要保证多次调用方法或者接口不会改变业务状态，可以保证重复调用的结果和单次调用的结果一致。</p><a id="more"></a><h4 id="使用幂等的场景"><a href="#使用幂等的场景" class="headerlink" title="使用幂等的场景"></a>使用幂等的场景</h4><ol><li><p>前端重复提交</p><p>用户注册，用户创建商品等操作，前端都会提交一些数据给后台服务，后台需要根据用户提交的数据在数据库中创建记录。如果用户不小心多点了几次，后端收到了好几次提交，这时就会在数据库中重复创建了多条记录。这就是接口没有幂等性带来的 bug。更新操作也会有相同的问题，直接以SQL语句举例子，<code>UPDATE tab1 SET col1=col1+1 WHERE col2=2</code>，每次执行都会改变数据库中的数据，这是不符合设计预期的。</p></li><li><p>接口超时重试</p><p>对于给第三方调用的接口，有可能会因为网络原因而调用失败，这时，一般在设计的时候会对接口调用加上失败重试的机制。如果第一次调用已经执行了一半时，发生了网络异常。这时再次调用时就会因为脏数据的存在而出现调用异常。</p></li><li><p>消息重复消费</p><p>在使用消息中间件来处理消息队列，且手动 ack 确认消息被正常消费时。如果消费者突然断开连接，并且没有发送ack，那么已经执行了一半的消息会重新放回队列。当消息被其他消费者重新消费时，如果没有幂等性，就会导致消息重复消费时结果异常，如数据库重复数据，数据库数据冲突，资源重复等。</p></li></ol><h4 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h4><ol><li><p>token机制实现</p><ol><li><p>客户端会先发送一个请求去获取 token，服务端会生成一个全局唯一的 ID 作为 token 保存在 redis 中，同时把这个 ID 返回给客户端</p></li><li><p>客户端第二次调用业务请求的时候必须携带这个 token</p></li><li><p>服务端会校验这个 token，如果校验成功，则执行业务，并删除 redis 中的 token</p></li><li><p>如果校验失败，说明 redis 中已经没有对应的 token，则表示重复操作，直接返回指定的结果给客户端</p><p>注意：</p><ul><li>对 redis 中是否存在 token 以及删除的代码逻辑需要保证原子性</li><li>全局唯一 ID 可以用百度的 uid-generator、美团的 Leaf 去生成</li></ul></li></ol></li><li><p>基于mysql实现</p><ol><li>建立一张去重表，其中某个字段需要建立唯一索引</li><li>客户端去请求服务端，服务端会将这次请求的一些信息插入这张去重表中</li><li>因为表中某个字段带有唯一索引，如果插入成功，证明表中没有这次请求的信息，则执行后续的业务逻辑</li><li>如果插入失败，则代表已经执行过当前请求，直接返回</li></ol></li><li><p>基于redis实现</p><ol><li>客户端先请求服务端，会拿到一个能代表这次请求业务的唯一字段</li><li>将该字段以 SETNX (set if not exist)的方式存入 redis 中，并根据业务设置相应的超时时间</li><li>如果设置成功，证明这是第一次请求，则执行后续的业务逻辑</li><li>如果设置失败，则代表已经执行过当前请求，直接返回</li></ol></li></ol>]]></content>
     
     
-      
-      
-    <summary type="html">&lt;p&gt;Welcome to &lt;a href=&quot;https://hexo.io/&quot;&gt;Hexo&lt;/a&gt;! This is your very first post. Check &lt;a href=&quot;https://hexo.io/docs/&quot;&gt;documentation&lt;/a&gt; for</summary>
-      
+    <summary type="html">&lt;h4 id=&quot;什么是接口幂等性&quot;&gt;&lt;a href=&quot;#什么是接口幂等性&quot; class=&quot;headerlink&quot; title=&quot;什么是接口幂等性&quot;&gt;&lt;/a&gt;什么是接口幂等性&lt;/h4&gt;&lt;p&gt;​    外部调用，失败应该被认为是常态，并且失败之后会存在重复调用的情况，而幂等性，就是要保证多次调用方法或者接口不会改变业务状态，可以保证重复调用的结果和单次调用的结果一致。&lt;/p&gt;</summary>
     
     
     
+    <category term="技术" scheme="http://example.com/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+    <category term="面试" scheme="http://example.com/tags/%E9%9D%A2%E8%AF%95/"/>
     
   </entry>
   
